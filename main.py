@@ -50,12 +50,12 @@ async def login(user: User):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/auth/google")
-async def auth_google(google_auth: GoogleAuth):
+@app.get("/auth/google")
+async def auth_google():
     try:
-        # Use Supabase's sign_in_with_oauth method for Google OAuth
-        response = supabase.auth.sign_in_with_oauth({"provider": "google", "token": google_auth.token})
-        return {"message": "Authentication with Google successful", "user": response}
+        # Redirect to Supabase's Google OAuth URL
+        auth_url = supabase.auth.sign_in_with_oauth({"provider": "google"})
+        return RedirectResponse(url=auth_url.url)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
