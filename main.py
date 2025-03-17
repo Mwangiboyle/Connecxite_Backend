@@ -3,6 +3,8 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import RedirectResponse
 from supabase import create_client, Client
 from pydantic import BaseModel
+from urllib.parse import urlparse
+import config
 import os
 from dotenv import load_dotenv
 
@@ -33,6 +35,33 @@ class User(BaseModel):
 
 class GoogleAuth(BaseModel):
     token: str
+    
+class LinkedInRequest(BaseModel):
+    user_url: str
+    target_url: str
+
+def extract_username(linkedin_url: str):
+    """Extract username from LinkedIn URL."""
+    return urlparse(linkedin_url).path.strip("/").split("/")[-1]
+
+@app.post("/generate-message")
+async def generate_message(request: LinkedInRequest):
+    """Endpoint to generate LinkedIn connection message."""
+    # Extract usernames
+    user_username = extract_username(request.user_url)
+    target_username = extract_username(request.target_url)
+
+    # Fetch profile data and posts for both user and target
+    user_profile = config.get_profile_data(request.user_url)
+    #user_posts = config.get_profile_posts(user_username)
+
+    target_profile = config.get_profile_data(request.target_url)
+    #target_posts = config.get_profile_posts(target_username)
+    
+    # Generate AI connection message
+    message = config.generate_ai_message(user_profile, target_profile)
+
+    return {"message": message}
 
 @app.post("/signup")
 async def signup(user: User):
