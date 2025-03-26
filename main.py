@@ -4,6 +4,7 @@ from fastapi.responses import RedirectResponse
 from supabase import create_client, Client
 from pydantic import BaseModel
 from urllib.parse import urlparse
+from typing import List, Optional
 import config
 import os
 from dotenv import load_dotenv
@@ -39,8 +40,9 @@ class GoogleAuth(BaseModel):
 class LinkedInRequest(BaseModel):
     user_url: str
     target_url: str
-    intent: str
-    character_length: int
+    intent: str = "network"
+    character_length: int = 300
+    attributes: Optional[List[str]] = None
 
 def extract_username(linkedin_url: str):
     """Extract username from LinkedIn URL."""
@@ -55,13 +57,21 @@ async def generate_message(request: LinkedInRequest):
 
     # Fetch profile data and posts for both user and target
     user_profile = config.get_profile_data(request.user_url)
+    user_data = config.clean_data(user_profile)
     #user_posts = config.get_profile_posts(user_username)
 
     target_profile = config.get_profile_data(request.target_url)
+    target_data = config.clean_data(target_profile)
     #target_posts = config.get_profile_posts(target_username)
     
     # Generate AI connection message
-    message = config.generate_ai_message(user_profile, target_profile)
+    message = config.generate_ai_message(
+        user_data=user_data,
+        target_data=target_data,
+        intent=request.intent,
+        attributes=request.attributes,
+        character_length=request.character_length
+    )
 
     return {"message": message}
 

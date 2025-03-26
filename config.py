@@ -38,8 +38,47 @@ def get_profile_posts(username: str):
 
     response = requests.get(url, headers=headers, params=querystring)
     return response.json()
-attributes = ['experience', 'skills', 'education', 'location']
-def generate_ai_message(user_data,target_data,intent, attributes, character_length):
+
+def clean_data(data):
+    #extract basic profile details
+    structured_data = {
+        "username": data.get("username", "N/A"),
+        "First_Name": data.get("firstName", "N/A"),
+        "Last_Name": data.get("lastName", "N/A"),
+        "Summary": data.get("summary", "N/A"),
+        "Headline": data.get("headline", "N/A"),
+        "Location": data.get("geo", []).get("country", "city"),
+        "Certifications": data.get("certifications", []),
+        "Projects": data.get("projects", "N/A")
+    }
+    #extract education
+    education_list = data.get("educations", [])
+    structured_data["Education"] =[{
+        "fieldOfStudy": education.get("fieldOfStudy", "N/A"),
+        "Degree":education.get("degree", "N/A"),
+        "University": education.get("schoolName", "N/A"),
+        "Start":education.get("start", []).get("year"),
+        "End":education.get("end", []).get("year", "N/A")
+    }
+    for education in education_list                               ]
+    #extract experiences
+    experience_list = data.get("position", [])
+    structured_data["Experience"] = [{
+        "Title": exp.get("title", "N/A"),
+        "Company": exp.get("companyName", "N/A"),
+        "Duration": exp.get("duration", "N/A"),
+        "Responsibilities": exp.get("description", [])
+    }
+    for exp in experience_list                                 ]
+    #extract skills
+    skill_list = data.get("skills", [])
+    structured_data["Skills"] = [skill.get("name", "N/A") for skill in skill_list]
+    
+    return structured_data
+     
+def generate_ai_message(user_data,target_data,intent, attributes=None, character_length=200):
+    if attributes is None:
+        attributes = ['experience', 'skills', 'education', 'location']
     prompt =f"""  
 You are an expert in generating Linkedin connection messages.
 your work is to Analyze both profiles and using the key {attributes} from both profiles and the {intent} of the connection, Generate one message with {character_length} characters that will
