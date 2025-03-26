@@ -39,6 +39,8 @@ class GoogleAuth(BaseModel):
 class LinkedInRequest(BaseModel):
     user_url: str
     target_url: str
+    intent: str
+    character_length: int
 
 def extract_username(linkedin_url: str):
     """Extract username from LinkedIn URL."""

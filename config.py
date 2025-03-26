@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import requests
-from openai import OpenAI
+from anthropic import Anthropic
 # Load environment variables
 load_dotenv()
 
@@ -10,13 +10,11 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST")
 
 # OpenAI API Key
-OPENAI_API_KEY = os.getenv("api_key")
+API_KEY = os.getenv("api_key")
 BASE_URL=os.getenv("base_url")
-client = OpenAI(
-    api_key=OPENAI_API_KEY,
-    base_url=BASE_URL
-)
 
+client = Anthropic(api_key=API_KEY
+                    )
 def get_profile_data(linkedin_url: str):
     """Fetch LinkedIn profile data using the provided URL."""
     url = "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url"
@@ -40,42 +38,24 @@ def get_profile_posts(username: str):
 
     response = requests.get(url, headers=headers, params=querystring)
     return response.json()
-
-def generate_ai_message(user_data,target_data):
-    prompt = f"""
-You are an AI designed to generate personalized LinkedIn connection messages.  
-Your task is to analyze the key attributes of both profiles and create a tailored message that encourages connection.  
-
+attributes = ['experience', 'skills', 'education', 'location']
+def generate_ai_message(user_data,target_data,intent, attributes, character_length):
+    prompt =f"""  
+You are an expert in generating Linkedin connection messages.
+your work is to Analyze both profiles and using the key {attributes} from both profiles and the {intent} of the connection, Generate one message with {character_length} characters that will
+enhance a better connection. Focus on generating an excellent message and go directly to the message as your response
 ### Profiles:  
-**Profile 1:**  
-{user_data} 
+user profile: {user_data} 
 
-**Profile 2:**  
-{target_data}  
-Do not mention what you are doing when generating the message just go direct to the message.
-
-Use a friendly and professional tone.  
-- Mention mutual connections if available.  
-- Highlight shared interests or skills if relevant.  
-- Keep the message concise (100-150 characters).  
-- End with a clear call to action.  
-
-If mutual connections or shared interests are not found, **skip those parts** rather than leaving placeholders.  
-
-**Format Example:**  
-"Hi [Target Name],  
-I came across your profile and was impressed by your work in [Target Job Title/Field].  
-As a [Your Job Title] in [Your Industry], I’d love to connect and exchange insights on [Relevant Topic].  
-Looking forward to connecting,  
-[Your Name]  
-[Your Job Title] at [Your Company]  
-[Your Location]"  
-
-Now, generate the message based on the provided attributes.
-
-"""
-    messages= client.completions.create(
-    model="deepseek/deepseek-r1-zero:free",
-    prompt=prompt
-    )
-    return messages.choices[0].text
+Target connection profile: {target_data}  
+"""  
+    message = client.messages.create(
+    model="claude-3-5-sonnet-20241022",
+    max_tokens=1000,
+    temperature=1,
+    system="You are an expert in professional networking and relationship building.",
+    messages=[{
+        "role": "user",
+        "content": prompt
+    }])
+    return message.content[0].text
