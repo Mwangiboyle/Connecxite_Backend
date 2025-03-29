@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com/"],  # Replace with your frontend URL
+    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com/", "http://localhost:4000"],  # Replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
