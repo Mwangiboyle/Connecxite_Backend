@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com/"],  # Replace with your frontend URL
+    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com/", "http://localhost:4000"],  # Replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,17 +57,17 @@ async def generate_message(request: LinkedInRequest):
 
     # Fetch profile data and posts for both user and target
     user_profile = config.get_profile_data(request.user_url)
-    user_data = config.clean_data(user_profile)
+    #user_data = config.clean_data(user_profile)
     #user_posts = config.get_profile_posts(user_username)
 
     target_profile = config.get_profile_data(request.target_url)
-    target_data = config.clean_data(target_profile)
+    #target_data = config.clean_data(target_profile)
     #target_posts = config.get_profile_posts(target_username)
     
     # Generate AI connection message
     message = config.generate_ai_message(
-        user_data=user_data,
-        target_data=target_data,
+        user_data=user_profile,
+        target_data=target_profile,
         intent=request.intent,
         attributes=request.attributes,
         character_length=request.character_length
