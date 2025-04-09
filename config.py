@@ -98,3 +98,40 @@ Target connection profile: {target_data}
         "content": prompt
     }])
     return message.content[0].text
+
+def generate_voice_script(user_data, target_data, intent):
+    prompt2 = f'''
+You are an expert at crafting **natural-sounding, conversational LinkedIn connection messages** that can be spoken aloud in **30-40 seconds**.  
+
+
+Analyze the user profile and the target profile, then generate a **short, engaging voice script** that:  
+1. **Sounds natural when spoken** (avoid robotic or overly formal tones).  
+2. **Mentions 1-2 key commonalities** (shared industry, skills, interests, or mutual connections).  
+3. **Aligns with the user's intent** (e.g., networking, collaboration, job opportunities).  
+4. **Ends with a clear call-to-action** (e.g., "Would love to chat!" or "Let’s connect!").  
+
+### **Rules:**  
+- **Length:** ~50-80 words (easily spoken in 30-40 sec).  
+- **Tone:** Professional but warm (like a quick elevator pitch).  
+- **No fluff**—get to the point while sounding human.  
+
+### **Input Data:**  
+- **User Profile: {user_data} 
+- **Target Profile:** {target_data}  
+- **Intent:** {intent}  
+
+Response Format: 
+Directly output **only the script** (no intro or explanations). Example:  
+> *"Hi [Name], I came across your profile and noticed we both work in [shared field]. Your experience at [Company] really stood out—especially your work on [specific detail]. I’d love to connect and exchange insights. Let me know if you’re open to a quick chat!"*  
+'''
+    message = client.messages.create(
+    model="claude-3-5-sonnet-20241022",
+    max_tokens=1000,
+    temperature=1,
+    system="You are an expert in professional networking and relationship building.",
+    messages=[{
+        "role": "user",
+        "content": prompt2
+    }])
+
+    return message.content[0].text

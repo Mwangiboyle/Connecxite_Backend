@@ -11,13 +11,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="Connecxite backend. made with fastapi")
 
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com/", "http://localhost:4000"],  # Replace with your frontend URL
+    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com/", "http://localhost:4000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,6 +43,11 @@ class LinkedInRequest(BaseModel):
     intent: str = "network"
     character_length: int = 300
     attributes: Optional[List[str]] = None
+
+class Data(BaseModel):
+    user_url: str
+    target_url: str
+    intent: str = "network"
 
 def extract_username(linkedin_url: str):
     """Extract username from LinkedIn URL."""
@@ -72,9 +77,20 @@ async def generate_message(request: LinkedInRequest):
         attributes=request.attributes,
         character_length=request.character_length
     )
-
+    
     return {"message": message}
-
+@app.post("/genearte_voice_script")
+async def voice_script(request: Data):
+    '''Endpoint to generate a voice script message'''
+    user_profile = config.get_profile_data(request.user_url)
+    target_profile = config.get_profile_data(request.target_url)
+    voice_message = config.generate_voice_script(
+        user_data=user_profile,
+        target_data=target_profile,
+        intent=request.intent
+    )
+    
+    return voice_message
 @app.post("/signup")
 async def signup(user: User):
     try:
