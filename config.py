@@ -17,7 +17,7 @@ client = Anthropic(api_key=API_KEY
                     )
 def get_profile_data(linkedin_url: str):
     """Fetch LinkedIn profile data using the provided URL."""
-    url = "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url"
+    url = "https://best-linkedin-scraper-api3.p.rapidapi.com/profile"
     querystring = {"url": linkedin_url}
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
