@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import requests
 from anthropic import Anthropic
+from supabase import create_client, Client
 # Load environment variables
 load_dotenv()
 
@@ -135,3 +136,69 @@ Directly output **only the script** (no intro or explanations). Example:
     }])
 
     return message.content[0].text
+
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+def calculate_user_metrics(user_id: str):
+    """Calculate all metrics for a user"""
+    # Calculate acceptance rate
+    result = supabase.rpc("calculate_acceptance_rate", {"user_id": user_id}).execute()
+    
+    # Calculate response rate (last 30 days)
+    supabase.rpc("calculate_response_rate", {"user_id": user_id}).execute()
+    
+    # Calculate industry metrics
+    supabase.rpc("calculate_industry_metrics", {"user_id": user_id}).execute()
+    
+    # Calculate template metrics
+    supabase.rpc("calculate_template_metrics", {"user_id": user_id}).execute()
+    
+    
+def extract_industry(url:str):
+    """Fetch LinkedIn profile data using the provided URL."""
+    url = "https://best-linkedin-scraper-api3.p.rapidapi.com/profile"
+    querystring = {"url": url}
+    headers = {
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": RAPIDAPI_HOST
+    }
+
+    response = requests.get(url, headers=headers, params=querystring)
+    prompt3 = f'''Analyze the given LinkedIn profile data (including job titles, company names, skills, and experience) and determine the primary industry this person works in. Respond with only the most relevant **one-word industry name** (e.g., "Technology," "Finance," "Healthcare").  
+    Rules: 
+    1. Focus on the **core business sector** of their current/most recent role.  
+    2. Ignore job titles—look at the company’s industry and their key responsibilities.  
+    3. If their career spans multiple industries, pick the dominant one.  
+    4. Return only the industry name—no explanations or extra words.  
+
+    **Examples:**  
+    Input:  
+    - Current Role: "Software Engineer at Google"  
+    - Past Role: "Developer at Microsoft"  
+    Output: "Technology"  
+    Input:  
+    - Current Role: "Marketing Manager at Nike"  
+    - Skills: "Brand Strategy, Digital Advertising"  
+    Output: "Retail"  
+
+    Input:  
+    - Current Role: "Senior Cardiologist at Mayo Clinic"  
+    - Education: "MD in Medicine"  
+    Output: "Healthcare"  
+
+    Now analyze this LinkedIn profile:  
+    {response}'''
+    
+    message = client.messages.create(
+        model="claude-3-5-sonnet-latest",
+        temperature=1,
+    system="You are an expert in professional networking and relationship building.",
+    messages=[{
+        "role": "user",
+        "content": prompt3
+    }])
+    
+    return message.content[0].text
+
