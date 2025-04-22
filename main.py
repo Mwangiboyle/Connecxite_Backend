@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from supabase import create_client, Client
 from datetime import datetime, timedelta
@@ -14,7 +15,6 @@ load_dotenv()
 
 app = FastAPI(title="Connecxite backend. made with fastapi")
 
-from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
