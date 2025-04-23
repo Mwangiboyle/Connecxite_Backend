@@ -7,8 +7,8 @@ from supabase import create_client, Client
 load_dotenv()
 
 # RapidAPI credentials
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
-RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST")
+#RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+#RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST")
 
 # OpenAI API Key
 API_KEY = os.getenv("api_key")
@@ -21,8 +21,8 @@ def get_profile_data(linkedin_url: str):
     url = "https://best-linkedin-scraper-api3.p.rapidapi.com/profile"
     querystring = {"url": linkedin_url}
     headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": RAPIDAPI_HOST
+        "x-rapidapi-key": "40a44ec5f8msh08a544684842dd1p11bd2fjsn4265bd2e892b",
+        "x-rapidapi-host": "linkedin-data-api.p.rapidapi.com"
     }
 
     response = requests.get(url, headers=headers, params=querystring)
@@ -33,8 +33,8 @@ def get_profile_posts(username: str):
     url = "https://linkedin-api8.p.rapidapi.com/get-profile-posts"
     querystring = {"username": username}
     headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": RAPIDAPI_HOST
+        "x-rapidapi-key": "40a44ec5f8msh08a544684842dd1p11bd2fjsn4265bd2e892b",
+        "x-rapidapi-host": "linkedin-data-api.p.rapidapi.com"
     }
 
     response = requests.get(url, headers=headers, params=querystring)
@@ -156,16 +156,17 @@ def calculate_user_metrics(user_id: str):
     supabase.rpc("calculate_template_metrics", {"user_id": user_id}).execute()
     
     
-def extract_industry(url:str):
+def extract_industry(linkedin_url:str):
     """Fetch LinkedIn profile data using the provided URL."""
-    url = "https://best-linkedin-scraper-api3.p.rapidapi.com/profile"
-    querystring = {"url": url}
+    url = "https://li-data-scraper.p.rapidapi.com/get-profile-data-by-url"
+    querystring = {"url": linkedin_url}
     headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": RAPIDAPI_HOST
+        "x-rapidapi-key": "40a44ec5f8msh08a544684842dd1p11bd2fjsn4265bd2e892b",
+        "x-rapidapi-host": "linkedin-data-api.p.rapidapi.com"
     }
 
     response = requests.get(url, headers=headers, params=querystring)
+    profile = response.json()
     prompt3 = f'''Analyze the given LinkedIn profile data (including job titles, company names, skills, and experience) and determine the primary industry this person works in. Respond with only the most relevant **one-word industry name** (e.g., "Technology," "Finance," "Healthcare").  
     Rules: 
     1. Focus on the **core business sector** of their current/most recent role.  
@@ -189,11 +190,12 @@ def extract_industry(url:str):
     Output: "Healthcare"  
 
     Now analyze this LinkedIn profile:  
-    {response}'''
+    {profile}'''
     
     message = client.messages.create(
-        model="claude-3-5-sonnet-latest",
-        temperature=1,
+    model="claude-3-5-sonnet-latest",
+    max_tokens=500,
+    temperature=1,
     system="You are an expert in professional networking and relationship building.",
     messages=[{
         "role": "user",
