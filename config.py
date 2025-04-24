@@ -18,11 +18,11 @@ client = Anthropic(api_key=API_KEY
                     )
 def get_profile_data(linkedin_url: str):
     """Fetch LinkedIn profile data using the provided URL."""
-    url = "https://best-linkedin-scraper-api3.p.rapidapi.com/profile"
+    url = "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url"
     querystring = {"url": linkedin_url}
     headers = {
         "x-rapidapi-key": "40a44ec5f8msh08a544684842dd1p11bd2fjsn4265bd2e892b",
-        "x-rapidapi-host": "linkedin-data-api.p.rapidapi.com"
+        "x-rapidapi-host": "linkedin-api8.p.rapidapi.com"
     }
 
     response = requests.get(url, headers=headers, params=querystring)
@@ -158,11 +158,11 @@ def calculate_user_metrics(user_id: str):
     
 def extract_industry(linkedin_url:str):
     """Fetch LinkedIn profile data using the provided URL."""
-    url = "https://li-data-scraper.p.rapidapi.com/get-profile-data-by-url"
+    url = "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url"
     querystring = {"url": linkedin_url}
     headers = {
         "x-rapidapi-key": "40a44ec5f8msh08a544684842dd1p11bd2fjsn4265bd2e892b",
-        "x-rapidapi-host": "linkedin-data-api.p.rapidapi.com"
+        "x-rapidapi-host": "linkedin-api8.p.rapidapi.com"
     }
 
     response = requests.get(url, headers=headers, params=querystring)

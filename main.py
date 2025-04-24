@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from typing import List, Optional
 import config
 import jwt
+import uuid
 import os
 from dotenv import load_dotenv
 
@@ -16,18 +17,19 @@ app = FastAPI(title="Connecxite backend. made with FastAPI")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com", "http://localhost:4000"],
+    allow_origins=["https://linkedin-connection-enhancer-2.onrender.com", "http://localhost:4000","http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
+# Initialize Supabase client
+supabase_url = os.getenv("SUPABASE_URL", "https://dusdlcrkvethipcqwnzk.supabase.co")
+supabase_key = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1c2RsY3JrdmV0aGlwY3F3bnprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNzUzMDEsImV4cCI6MjA1Njc1MTMwMX0.o7mTueOtmmVckk-KlyKQc5GhpvHGez4El-evQtil62s")
 supabase: Client = create_client(supabase_url, supabase_key)
 
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-ja(+nqnk)q6y=)3)fq^6s39)1a#d^r&&q7o19&p=yu8f@*d7w&")
 security = HTTPBearer()
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "your-fallback-secret")
 ALGORITHM = "HS256"
 
 class User(BaseModel):
@@ -76,7 +78,7 @@ async def generate_message(request: LinkedInRequest, payload: dict = Depends(ver
             character_length=request.character_length
         )
 
-        await record_connection_request(request, payload)
+        #await record_connection_request(request, payload)
         return {"message": message}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -85,17 +87,25 @@ async def generate_message(request: LinkedInRequest, payload: dict = Depends(ver
 async def record_connection_request(request: LinkedInRequest, payload: dict = Depends(verify_token)):
     try:
         user_id = payload.get("user_id")
+        # Convert Django user ID to UUID string format
+        user_uuid = str(uuid.UUID(int=int(user_id)))
         industry = config.extract_industry(request.target_url)
+        target_url = request.target_url  # Store the full URL instead of just username
 
         data = supabase.table("connection_requests").insert({
-            "user_id": user_id,
-            "target_url": request.target_url,
+            "user_id": user_uuid,
+            "target_url": target_url,  # Changed from target_username to target_url
             "template_used": request.intent,
             "industry": industry,
             "status": "sent"
         }).execute()
 
-        supabase.rpc("increment_total_requests", {"user_id": user_id}).execute()
+        # Ensure user_metrics table has this user
+        supabase.table("user_metrics").upsert({
+            "user_id": user_uuid,
+            "total_requests": 1
+        }, on_conflict="user_id").execute()
+
         return {"message": "Request recorded", "request_id": data.data[0]['id']}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -104,11 +114,15 @@ async def record_connection_request(request: LinkedInRequest, payload: dict = De
 async def update_connection_status(update: ConnectionStatusUpdate, payload: dict = Depends(verify_token)):
     try:
         user_id = payload.get("user_id")
+        user_uuid = str(uuid.UUID(int=int(user_id)))
+        
         supabase.table("connection_requests").update({
             "status": update.new_status
         }).eq("id", update.request_id).execute()
 
-        config.calculate_user_metrics(user_id)
+        # Recalculate metrics
+        supabase.rpc("calculate_user_metrics", {"user_id": user_uuid}).execute()
+        
         return {"message": "Status updated"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -117,17 +131,31 @@ async def update_connection_status(update: ConnectionStatusUpdate, payload: dict
 async def get_metrics(payload: dict = Depends(verify_token)):
     try:
         user_id = payload.get("user_id")
-        metrics = supabase.table("user_metrics").select("*").eq("user_id", user_id).execute().data[0]
-        industry_metrics = supabase.table("industry_metrics").select("*").eq("user_id", user_id).execute().data
-        template_metrics = supabase.table("template_metrics").select("*").eq("user_id", user_id).execute().data
+        user_uuid = str(uuid.UUID(int=int(user_id)))
+
+        # Get metrics data
+        metrics = supabase.table("user_metrics").select("*").eq("user_id", user_uuid).execute()
+        industry_metrics = supabase.table("industry_metrics").select("*").eq("user_id", user_uuid).execute()
+        template_metrics = supabase.table("template_metrics").select("*").eq("user_id", user_uuid).execute()
+
+        # Handle case where metrics don't exist yet
+        if not metrics.data:
+            return {
+                "connection_requests": 0,
+                "acceptance_rate": 0,
+                "active_conversations": 0,
+                "response_rate": 0,
+                "industries": {},
+                "templates": {}
+            }
 
         return {
-            "connection_requests": metrics["total_requests"],
-            "acceptance_rate": metrics["acceptance_rate"],
-            "active_conversations": metrics["active_conversations"],
-            "response_rate": metrics["response_rate"],
-            "industries": {im["industry"]: im["success_rate"] for im in industry_metrics},
-            "templates": {tm["template_name"]: tm["success_rate"] for tm in template_metrics}
+            "connection_requests": metrics.data[0].get("total_requests", 0),
+            "acceptance_rate": metrics.data[0].get("acceptance_rate", 0),
+            "active_conversations": metrics.data[0].get("active_conversations", 0),
+            "response_rate": metrics.data[0].get("response_rate", 0),
+            "industries": {im["industry"]: im["success_rate"] for im in industry_metrics.data},
+            "templates": {tm["template_name"]: tm["success_rate"] for tm in template_metrics.data}
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
