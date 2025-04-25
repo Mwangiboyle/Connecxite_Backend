@@ -159,7 +159,16 @@ async def get_metrics(payload: dict = Depends(verify_token)):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
+@app.post("/generate-voice-script")
+async def generate_voice_script(request: Data):
+    try:
+        user_data  =config.get_profile_data(request.user_url)
+        target_data = config.get_profile_data(request.target_url)
+        response = config.generate_voice_script(user_data,target_data,request.intent)
+        return {"message": response}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
 @app.get("/")
 async def root():
     return {"message": "Welcome to the FastAPI Connecxite backend"}
