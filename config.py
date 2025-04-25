@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 import requests
-from anthropic import Anthropic
+#from anthropic import Anthropic
+from mistralai import Mistral
 from supabase import create_client, Client
 # Load environment variables
 load_dotenv()
@@ -13,9 +14,11 @@ load_dotenv()
 # OpenAI API Key
 API_KEY = os.getenv("api_key")
 BASE_URL=os.getenv("base_url")
+MISTRAL_API_KEY = os.getenv("mistral_api_key") 
+#client = Anthropic(api_key=API_KEY)
 
-client = Anthropic(api_key=API_KEY
-                    )
+client = Mistral(api_key=MISTRAL_API_KEY)
+
 def get_profile_data(linkedin_url: str):
     """Fetch LinkedIn profile data using the provided URL."""
     url = "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url"
@@ -89,16 +92,17 @@ user profile: {user_data}
 
 Target connection profile: {target_data}  
 """  
-    message = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1000,
-    temperature=1,
-    system="You are an expert in professional networking and relationship building.",
-    messages=[{
-        "role": "user",
-        "content": prompt
-    }])
-    return message.content[0].text
+    response = client.chat.complete(
+        model = "mistral-large-latest",
+        messages=[
+            {
+                "role": "user",
+                "content" : prompt
+            }
+        ]
+    )
+    return response.choices[0].message.content
+    
 
 def generate_voice_script(user_data, target_data, intent):
     prompt2 = f'''
@@ -125,17 +129,16 @@ Response Format:
 Directly output **only the script** (no intro or explanations). Example:  
 > *"Hi [Name], I came across your profile and noticed we both work in [shared field]. Your experience at [Company] really stood out—especially your work on [specific detail]. I’d love to connect and exchange insights. Let me know if you’re open to a quick chat!"*  
 '''
-    message = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1000,
-    temperature=1,
-    system="You are an expert in professional networking and relationship building.",
-    messages=[{
-        "role": "user",
-        "content": prompt2
-    }])
-
-    return message.content[0].text
+    response = client.chat.complete(
+        model = "mistral-large-latest",
+        messages=[
+            {
+                "role": "user",
+                "content" : prompt2
+            }
+        ]
+    )
+    return response.choices[0].message.content
 
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_key = os.getenv("SUPABASE_KEY")
@@ -192,15 +195,14 @@ def extract_industry(linkedin_url:str):
     Now analyze this LinkedIn profile:  
     {profile}'''
     
-    message = client.messages.create(
-    model="claude-3-5-sonnet-latest",
-    max_tokens=500,
-    temperature=1,
-    system="You are an expert in professional networking and relationship building.",
-    messages=[{
-        "role": "user",
-        "content": prompt3
-    }])
-    
-    return message.content[0].text
+    Message = client.chat.complete(
+        model = "mistral-large-latest",
+        messages=[
+            {
+                "role": "user",
+                "content" : prompt3
+            }
+        ]
+    )
+    return Message.choices[0].message.content
 
