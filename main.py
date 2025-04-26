@@ -28,7 +28,7 @@ supabase_url = os.getenv("SUPABASE_URL", "https://dusdlcrkvethipcqwnzk.supabase.
 supabase_key = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1c2RsY3JrdmV0aGlwY3F3bnprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNzUzMDEsImV4cCI6MjA1Njc1MTMwMX0.o7mTueOtmmVckk-KlyKQc5GhpvHGez4El-evQtil62s")
 supabase: Client = create_client(supabase_url, supabase_key)
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-ja(+nqnk)q6y=)3)fq^6s39)1a#d^r&&q7o19&p=yu8f@*d7w&")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 security = HTTPBearer()
 ALGORITHM = "HS256"
 
