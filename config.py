@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import requests
 #from anthropic import Anthropic
 from mistralai import Mistral
-from supabase import create_client, Client
+
 # Load environment variables
 load_dotenv()
 
@@ -140,23 +140,6 @@ Directly output **only the script** (no intro or explanations). Example:
     )
     return response.choices[0].message.content
 
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(supabase_url, supabase_key)
-
-def calculate_user_metrics(user_id: str):
-    """Calculate all metrics for a user"""
-    # Calculate acceptance rate
-    result = supabase.rpc("calculate_acceptance_rate", {"user_id": user_id}).execute()
-    
-    # Calculate response rate (last 30 days)
-    supabase.rpc("calculate_response_rate", {"user_id": user_id}).execute()
-    
-    # Calculate industry metrics
-    supabase.rpc("calculate_industry_metrics", {"user_id": user_id}).execute()
-    
-    # Calculate template metrics
-    supabase.rpc("calculate_template_metrics", {"user_id": user_id}).execute()
     
     
 def extract_industry(linkedin_url:str):

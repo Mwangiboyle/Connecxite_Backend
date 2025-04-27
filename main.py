@@ -1,20 +1,44 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client, Client
 from pydantic import BaseModel
 from urllib.parse import urlparse
 from typing import List, Optional
+import asyncpg
 import config
 import jwt
 import uuid
 import os
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Connecxite backend. made with FastAPI")
+# Connection pool setup
+pool = None
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize the connection pool when app starts
+    global pool
+    pool = await asyncpg.create_pool(
+        database=os.getenv("DB_NAME", "your_database"),
+        user=os.getenv("DB_USER", "your_user"),
+        password=os.getenv("DB_PASSWORD", "your_password"),
+        host=os.getenv("DB_HOST", "your_vps_ip"),
+        port=os.getenv("DB_PORT", "5432"),
+        min_size=5,  # Minimum number of connections
+        max_size=20,  # Maximum number of connections
+        max_inactive_connection_lifetime=300  # Recycle connections after 5 minutes
+    )
+    yield
+    # Close the connection pool when app shuts down
+    await pool.close()
+
+app = FastAPI(
+    title="Connecxite backend. made with FastAPI",
+    lifespan=lifespan
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://linkedin-connection-enhancer-2.onrender.com", "http://localhost:4000","http://localhost:8000"],
@@ -22,13 +46,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Database connection function
+@asynccontextmanager
+async def get_db_connection():
+    connection = await pool.acquire()
+    try:
+        yield connection
+    finally:
+        await pool.release(connection)
 
-# Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL", "https://dusdlcrkvethipcqwnzk.supabase.co")
-supabase_key = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1c2RsY3JrdmV0aGlwY3F3bnprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNzUzMDEsImV4cCI6MjA1Njc1MTMwMX0.o7mTueOtmmVckk-KlyKQc5GhpvHGez4El-evQtil62s")
-supabase: Client = create_client(supabase_url, supabase_key)
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+security = HTTPBearer()
+ALGORITHM = "HS256"
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-ja(+nqnk)q6y=)3)fq^6s39)1a#d^r&&q7o19&p=yu8f@*d7w&")
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 security = HTTPBearer()
 ALGORITHM = "HS256"
 
@@ -78,87 +110,115 @@ async def generate_message(request: LinkedInRequest, payload: dict = Depends(ver
             character_length=request.character_length
         )
 
-        #await record_connection_request(request, payload)
+        await record_connection_request(request, payload)
         return {"message": message}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/record-connection-request")
 async def record_connection_request(request: LinkedInRequest, payload: dict = Depends(verify_token)):
-    try:
-        user_id = payload.get("user_id")
-        # Convert Django user ID to UUID string format
-        user_uuid = str(uuid.UUID(int=int(user_id)))
-        industry = config.extract_industry(request.target_url)
-        target_url = request.target_url  # Store the full URL instead of just username
+    async with get_db_connection() as conn:
+        try:
+            user_id = payload.get("user_id")
+            industry = config.extract_industry(request.target_url)
+            target_url = request.target_url
 
-        data = supabase.table("connection_requests").insert({
-            "user_id": user_uuid,
-            "target_url": target_url,  # Changed from target_username to target_url
-            "template_used": request.intent,
-            "industry": industry,
-            "status": "sent"
-        }).execute()
+            # Insert connection request
+            request_id = await conn.fetchval("""
+                INSERT INTO connection_requests 
+                (user_id, target_url, template_used, industry, status)
+                VALUES ($1, $2, $3, $4, 'sent')
+                RETURNING id
+            """, user_id, target_url, request.intent, industry)
+            
+            # Initialize or update user metrics
+            await conn.execute("""
+                INSERT INTO user_metrics (user_id, total_requests)
+                VALUES ($1, 1)
+                ON CONFLICT (user_id) 
+                DO UPDATE SET 
+                    total_requests = user_metrics.total_requests + 1,
+                    last_updated = NOW()
+            """, user_id)
 
-        # Ensure user_metrics table has this user
-        supabase.table("user_metrics").upsert({
-            "user_id": user_uuid,
-            "total_requests": 1
-        }, on_conflict="user_id").execute()
+            # Call the calculate functions
+            await conn.execute("SELECT calculate_acceptance_rate($1)", user_id)
+            await conn.execute("SELECT calculate_response_rate($1)", user_id)
+            await conn.execute("SELECT calculate_industry_metrics($1)", user_id)
+            await conn.execute("SELECT calculate_template_metrics($1)", user_id)
 
-        return {"message": "Request recorded", "request_id": data.data[0]['id']}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+            return {"message": "Request recorded", "request_id": request_id}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/update-connection-status")
 async def update_connection_status(update: ConnectionStatusUpdate, payload: dict = Depends(verify_token)):
-    try:
-        user_id = payload.get("user_id")
-        user_uuid = str(uuid.UUID(int=int(user_id)))
-        
-        supabase.table("connection_requests").update({
-            "status": update.new_status
-        }).eq("id", update.request_id).execute()
+    async with get_db_connection() as conn:
+        try:
+            user_id = payload.get("user_id")
+            
+            # Update status
+            await conn.execute("""
+                UPDATE connection_requests
+                SET status = $1
+                WHERE id = $2
+            """, update.new_status, update.request_id)
 
-        # Recalculate metrics
-        supabase.rpc("calculate_user_metrics", {"user_id": user_uuid}).execute()
-        
-        return {"message": "Status updated"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+            # Recalculate all metrics
+            await conn.execute("SELECT calculate_acceptance_rate($1)", user_id)
+            await conn.execute("SELECT calculate_response_rate($1)", user_id)
+            await conn.execute("SELECT calculate_industry_metrics($1)", user_id)
+            await conn.execute("SELECT calculate_template_metrics($1)", user_id)
+
+            return {"message": "Status updated"}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/get-metrics")
 async def get_metrics(payload: dict = Depends(verify_token)):
-    try:
-        user_id = payload.get("user_id")
-        user_uuid = str(uuid.UUID(int=int(user_id)))
+    async with get_db_connection() as conn:
+        try:
+            user_id = payload.get("user_id")
+            
+            # Get metrics data
+            metrics = await conn.fetchrow(
+                "SELECT * FROM user_metrics WHERE user_id = $1", 
+                user_id
+            )
+            
+            industry_metrics = await conn.fetch(
+                "SELECT * FROM industry_metrics WHERE user_id = $1", 
+                user_id
+            )
+            
+            template_metrics = await conn.fetch(
+                "SELECT * FROM template_metrics WHERE user_id = $1", 
+                user_id
+            )
 
-        # Get metrics data
-        metrics = supabase.table("user_metrics").select("*").eq("user_id", user_uuid).execute()
-        industry_metrics = supabase.table("industry_metrics").select("*").eq("user_id", user_uuid).execute()
-        template_metrics = supabase.table("template_metrics").select("*").eq("user_id", user_uuid).execute()
+            # Handle case where metrics don't exist yet
+            if not metrics:
+                return {
+                    "connection_requests": 0,
+                    "acceptance_rate": 0,
+                    "active_conversations": 0,
+                    "response_rate": 0,
+                    "industries": {},
+                    "templates": {}
+                }
 
-        # Handle case where metrics don't exist yet
-        if not metrics.data:
             return {
-                "connection_requests": 0,
-                "acceptance_rate": 0,
-                "active_conversations": 0,
-                "response_rate": 0,
-                "industries": {},
-                "templates": {}
+                "connection_requests": metrics.get("total_requests", 0),
+                "acceptance_rate": metrics.get("acceptance_rate", 0),
+                "active_conversations": metrics.get("active_conversations", 0),
+                "response_rate": metrics.get("response_rate", 0),
+                "industries": {im["industry"]: im["success_rate"] for im in industry_metrics},
+                "templates": {tm["template_name"]: tm["success_rate"] for tm in template_metrics}
             }
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
-        return {
-            "connection_requests": metrics.data[0].get("total_requests", 0),
-            "acceptance_rate": metrics.data[0].get("acceptance_rate", 0),
-            "active_conversations": metrics.data[0].get("active_conversations", 0),
-            "response_rate": metrics.data[0].get("response_rate", 0),
-            "industries": {im["industry"]: im["success_rate"] for im in industry_metrics.data},
-            "templates": {tm["template_name"]: tm["success_rate"] for tm in template_metrics.data}
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/generate-voice-script")
 async def generate_voice_script(request: Data):
     try:
@@ -168,7 +228,28 @@ async def generate_voice_script(request: Data):
         return {"message": response}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-        
+
+@app.get("/list-functions")
+async def list_functions():
+    async with get_db_connection() as conn:
+        functions = await conn.fetch("""
+            SELECT 
+                n.nspname as schema,
+                p.proname as function_name,
+                pg_get_function_result(p.oid) as return_type,
+                pg_get_function_arguments(p.oid) as arguments
+            FROM 
+                pg_proc p
+            LEFT JOIN 
+                pg_namespace n ON p.pronamespace = n.oid
+            WHERE 
+                n.nspname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY 
+                schema, function_name;
+        """)
+        return [dict(func) for func in functions]
+    
+    
 @app.get("/")
 async def root():
     return {"message": "Welcome to the FastAPI Connecxite backend"}
