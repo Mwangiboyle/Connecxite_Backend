@@ -1,0 +1,21 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore local virtual environments
+venv/
+
+# Ignore Git metadata
+.git
+.gitignore
+
+# Ignore environment variables
+.env
+
+# Ignore Vercel folder (if not needed inside Docker)
+.vercel/
+
+# Ignore README and LICENSE if you don't need them in image
+README.md
+LICENSE
