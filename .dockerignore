@@ -13,6 +13,7 @@ venv/
 # Ignore environment variables
 .env
 
+sample.py
 # Ignore Vercel folder (if not needed inside Docker)
 .vercel/
 
