@@ -229,7 +229,28 @@ async def generate_voice_script(request: Data):
         return {"message": response}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-        
+
+@app.get("/list-functions")
+async def list_functions():
+    async with get_db_connection() as conn:
+        functions = await conn.fetch("""
+            SELECT 
+                n.nspname as schema,
+                p.proname as function_name,
+                pg_get_function_result(p.oid) as return_type,
+                pg_get_function_arguments(p.oid) as arguments
+            FROM 
+                pg_proc p
+            LEFT JOIN 
+                pg_namespace n ON p.pronamespace = n.oid
+            WHERE 
+                n.nspname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY 
+                schema, function_name;
+        """)
+        return [dict(func) for func in functions]
+    
+    
 @app.get("/")
 async def root():
     return {"message": "Welcome to the FastAPI Connecxite backend"}
