@@ -12,9 +12,9 @@ load_dotenv()
 #RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST")
 
 # OpenAI API Key
-API_KEY = os.getenv("api_key")
-BASE_URL=os.getenv("base_url")
-MISTRAL_API_KEY = os.getenv("mistral_api_key") 
+#API_KEY = os.getenv("api_key")
+#BASE_URL=os.getenv("base_url")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY") 
 #client = Anthropic(api_key=API_KEY)
 
 client = Mistral(api_key=MISTRAL_API_KEY)
