@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Expose the port the app runs on
+# Expose the port the app runs on docker
 EXPOSE 8004
 
 # Command to run the application
