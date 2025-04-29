@@ -3,3 +3,4 @@ __pycache__
 .emv.copy
 venv
 sample.py
+sample.yml
