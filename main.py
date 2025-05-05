@@ -249,7 +249,26 @@ async def list_functions():
         """)
         return [dict(func) for func in functions]
     
-    
+
+@app.get("/selected-table-columns")
+async def get_selected_table_columns():
+    selected_tables = ["connection_requests","industry_metrics", "user_metrics", "template_metrics"]
+
+    async with get_db_connection() as conn:
+        columns_info = {}
+
+        for table in selected_tables:
+            rows = await conn.fetch("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = $1
+                ORDER BY ordinal_position;
+            """, table)
+            columns_info[table] = [dict(row) for row in rows]
+
+        return columns_info
+
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to the FastAPI Connecxite backend"}
