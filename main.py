@@ -60,10 +60,6 @@ security = HTTPBearer()
 ALGORITHM = "HS256"
 
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-security = HTTPBearer()
-ALGORITHM = "HS256"
-
 class User(BaseModel):
     email: str
     password: str
@@ -110,8 +106,9 @@ async def generate_message(request: LinkedInRequest, payload: dict = Depends(ver
             character_length=request.character_length
         )
 
-        await record_connection_request(request, payload)
-        return {"message": message}
+        response = await record_connection_request(request, payload)
+        request_id = response.get("request_id")
+        return {"message": message, "request_id": request_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
