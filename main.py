@@ -12,7 +12,7 @@ import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Connection pool setup
 pool = None
